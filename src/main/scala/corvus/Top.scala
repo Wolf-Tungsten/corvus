@@ -11,5 +11,5 @@ class Top(implicit p:CorvusConfig) extends Module {
 
   // 直接实例化SCore
   printf("CorvusTop: NUM_S_CORE = %d\n", p.numSCore.U)
-  io.led := p.syncTreeFactor.U
+  io.led := 0.U
 }

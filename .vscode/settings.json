@@ -1,0 +1,7 @@
+{
+  "files.watcherExclude": {
+    "**/target": true
+  },
+  "editor.detectIndentation": true,
+  "editor.indentSize": 2
+}
