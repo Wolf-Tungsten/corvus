@@ -1,37 +1,210 @@
-// import Mill dependency
+package build
+
+import $ivy.`de.tototec::de.tobiasroeser.mill.vcs.version::0.4.0`
+import $ivy.`org.chipsalliance::chisel:6.7.0`
+import $ivy.`org.chipsalliance::firtool-resolver:2.0.1`
+import de.tobiasroeser.mill.vcs.version.VcsVersion
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import mill._
-import mill.define.Sources
-import mill.modules.Util
-import mill.scalalib.TestModule.ScalaTest
-import scalalib._
-// support BSP
-import mill.bsp._
+import mill.scalalib._
+import mill.scalalib.scalafmt.ScalafmtModule
+import os.Path
 
-// Note: This project requires .mill-jvm-opts file containing:
-//   -Dchisel.project.root=${PWD}
-// This is needed because Chisel needs to know the project root directory
-// to properly generate and handle test directories and output files.
-// See: https://github.com/com-lihaoyi/mill/issues/3840
+val defaultScalaVersion = "2.13.15"
 
-object `corvus` extends SbtModule { m =>
-  override def millSourcePath = super.millSourcePath / os.up
-  override def scalaVersion = "2.13.16"
-  def chiselVersion = "7.0.0"
-  override def scalacOptions = Seq(
-    "-language:reflectiveCalls",
-    "-deprecation",
-    "-feature",
-    "-Xcheckinit",
-    "-Ymacro-annotations",
-  )
-  override def ivyDeps = Agg(
-    ivy"org.chipsalliance::chisel:$chiselVersion",
-  )
-  override def scalacPluginIvyDeps = Agg(
-    ivy"org.chipsalliance:::chisel-plugin:$chiselVersion",
-  )
+val pwd = os.Path(sys.env("MILL_WORKSPACE_ROOT"))
+
+trait ChiselModule extends SbtModule with ScalafmtModule {
+  def scalaVersion: T[String] = defaultScalaVersion
+
+  def scalacOptions = Seq("-language:reflectiveCalls", "-Ymacro-annotations", "-Ytasty-reader")
+
+  def ivyDeps: T[Agg[Dep]] = Agg(ivy"org.chipsalliance::chisel:6.7.0")
+
+  def scalacPluginIvyDeps: T[Agg[Dep]] = Agg(ivy"org.chipsalliance:::chisel-plugin:6.7.0")
+
+  def resolveFirtoolDeps = T {
+    firtoolresolver.Resolve(chisel3.BuildInfo.firtoolVersion.get, true) match {
+      case Right(bin) => bin.path.getAbsolutePath
+      case Left(err)  => err
+    }
+  }
+}
+
+object `rocket-chip` extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "rocket-chip"
+  object macros extends ScalaModule {
+    def scalaVersion: T[String] = defaultScalaVersion
+
+    def ivyDeps: T[Agg[Dep]] = Agg(ivy"org.scala-lang:scala-reflect:$defaultScalaVersion")
+  }
+
+  object hardfloat extends ChiselModule {
+    def millSourcePath: Path = pwd / "XiangShan" / "rocket-chip" / "hardfloat" / "hardfloat"
+  }
+
+  object cde extends ScalaModule {
+    def scalaVersion: T[String] = defaultScalaVersion
+
+    def millSourcePath: Path = pwd / "XiangShan" / "rocket-chip" / "cde" / "cde"
+  }
+
+  def mainClass = Some("freechips.rocketchip.diplomacy.Main")
+
+  def moduleDeps = Seq(macros, hardfloat, cde)
+
+  def ivyDeps: T[Agg[Dep]] =
+    super.ivyDeps() ++ Agg(ivy"com.lihaoyi::mainargs:0.7.7", ivy"org.json4s::json4s-jackson:4.0.7")
+}
+
+object utility extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "utility"
+  def moduleDeps = Seq(`rocket-chip`)
+
+  def ivyDeps: T[Agg[Dep]] = super.ivyDeps() ++ Agg(ivy"com.lihaoyi::sourcecode:0.4.4")
+}
+
+object yunsuan extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "yunsuan"
+}
+
+object huancun extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "huancun"
+  def moduleDeps = Seq(`rocket-chip`, utility)
+}
+
+object coupledL2 extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "coupledL2"
+  def moduleDeps = Seq(`rocket-chip`, utility, huancun)
+}
+
+object openNCB extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "openLLC" / "openNCB"
+
+  def moduleDeps = Seq(`rocket-chip`)
+}
+
+object openLLC extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "openLLC"
+  def moduleDeps = Seq(`rocket-chip`, utility, coupledL2, openNCB)
+}
+
+object difftest extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "difftest"
   object test extends SbtTests with TestModule.ScalaTest {
-    override def ivyDeps = m.ivyDeps() ++ Agg(
+    override def sources: T[Seq[PathRef]] = Task.Sources {
+      super.sources() ++ Seq(PathRef(this.millSourcePath / "src" / "generator" / "chisel"))
+    }
+  }
+}
+
+object fudian extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "fudian"
+}
+
+object ChiselAIA extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan" / "ChiselAIA"
+  def moduleDeps = Seq(`rocket-chip`, utility)
+}
+
+object macros extends ScalaModule {
+  def millSourcePath = pwd / "XiangShan" / "macros"
+  def scalaVersion: T[String] = defaultScalaVersion
+
+  def ivyDeps: T[Agg[Dep]] = Agg(ivy"org.scala-lang:scala-reflect:$defaultScalaVersion")
+}
+
+object xiangshan extends ChiselModule {
+  def millSourcePath = pwd / "XiangShan"
+
+  def moduleDeps = Seq(
+    `rocket-chip`,
+    difftest,
+    huancun,
+    coupledL2,
+    openLLC,
+    yunsuan,
+    fudian,
+    utility,
+    ChiselAIA,
+    macros
+  )
+
+  val resourcesPath: String = (pwd / "XiangShan" / "src" / "main" / "resources").toString()
+  val envPath:       String = sys.env("PATH") + ":" + resourcesPath
+
+  def forkEnv = Map("PATH" -> envPath)
+
+  def forkArgs = Seq(
+    s"-Xmx${sys.props.getOrElse("jvm-xmx", "40G")}",
+    s"-Xss${sys.props.getOrElse("jvm-xss", "256m")}"
+  )
+
+  def ivyDeps: T[Agg[Dep]] = super.ivyDeps() ++ Agg(
+    ivy"edu.berkeley.cs::chiseltest:6.0.0",
+    ivy"org.scalatest::scalatest:3.2.19",
+    ivy"io.circe::circe-yaml:0.16.1",
+    ivy"io.circe::circe-generic-extras:0.14.4"
+  )
+
+  def scalacOptions: T[Seq[String]] = super.scalacOptions() ++ Agg("-deprecation", "-feature")
+
+  private def publishVersion: T[String] = "dev"
+
+  // gitStatus changes frequently and unpredictably. Use `Task.Input` here.
+  private def gitStatus: T[String] = Task.Input {
+    val gitRevParseBuilder = new ProcessBuilder("git", "rev-parse", "HEAD")
+    val gitRevParseProcess = gitRevParseBuilder.start()
+    val shaReader          = new BufferedReader(new InputStreamReader(gitRevParseProcess.getInputStream))
+    val sha                = shaReader.readLine()
+
+    val gitStatusBuilder = new ProcessBuilder("git", "status", "-uno", "--porcelain")
+    val gitStatusProcess = gitStatusBuilder.start()
+    val gitStatusReader  = new BufferedReader(new InputStreamReader(gitStatusProcess.getInputStream))
+    val status           = gitStatusReader.readLine()
+    val gitDirty         = if (status == null) 0 else 1
+
+    val str =
+      s"""|SHA=$sha
+          |dirty=$gitDirty
+          |""".stripMargin
+    str
+  }
+
+  override def resources: T[Seq[PathRef]] = Task.Sources {
+    os.write(T.dest / "publishVersion", publishVersion())
+    os.write(T.dest / "gitStatus", gitStatus())
+    os.write(T.dest / "gitModules", os.proc("git", "submodule", "status").call().out.text())
+    super.resources() ++ Seq(PathRef(T.dest))
+  }
+
+  object test extends SbtTests with TestModule.ScalaTest {
+    override def moduleDeps = super.moduleDeps ++ Seq(
+      difftest.test
+    )
+
+    override def forkArgs = super.forkArgs
+
+    override def scalacOptions = super.scalacOptions() ++ Agg("-deprecation", "-feature")
+
+    val resourcesPATH = (pwd / "XiangShan" / "src" / "main" / "resources").toString()
+    val envPATH = sys.env("PATH") + ":" + resourcesPATH
+
+    override def forkEnv = Map("PATH" -> envPATH)
+  }
+}
+
+object corvus extends ChiselModule {
+  override def millSourcePath = pwd
+
+  def moduleDeps = Seq(xiangshan)
+
+  object test extends SbtTests with TestModule.ScalaTest {
+    override def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"org.scalatest::scalatest::3.2.19"
     )
   }
