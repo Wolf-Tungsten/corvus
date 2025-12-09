@@ -7,7 +7,7 @@ import corvus.CorvusConfig
 class BroadcastTree(implicit p: CorvusConfig) extends Module {
   val NUM_S_CORE = p.numSCore
   val FACTOR = p.syncTreeConfig.syncTreeFactor
-  val WIDTH = p.syncTreeConfig.stateWidth
+  val WIDTH = p.syncTreeConfig.flagWidth
   val INVALID = 0.U(WIDTH.W)
 
   val io = IO(new Bundle {

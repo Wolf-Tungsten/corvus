@@ -6,7 +6,7 @@ import corvus.CorvusConfig
 
 class SyncTree(implicit p: CorvusConfig) extends Module {
   val NUM_S_CORE = p.numSCore
-  val WIDTH = p.syncTreeConfig.stateWidth
+  val WIDTH = p.syncTreeConfig.flagWidth
 
   val io = IO(new Bundle {
     val masterIn = Input(UInt(WIDTH.W))

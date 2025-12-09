@@ -8,7 +8,7 @@ class BroadcastNode(implicit p: CorvusConfig) extends Module {
   val FACTOR: Int = p.syncTreeConfig.syncTreeFactor
   require((FACTOR & (FACTOR - 1)) == 0, "syncTreeFactor must be a power of 2")
   require(FACTOR >= 2, "syncTreeFactor must be at least 2")
-  val WIDTH: Int = p.syncTreeConfig.stateWidth
+  val WIDTH: Int = p.syncTreeConfig.flagWidth
 
   val io = IO(new Bundle {
     val out = Output(Vec(FACTOR, UInt(WIDTH.W)))

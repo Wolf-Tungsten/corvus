@@ -8,7 +8,7 @@ import scala.util.Random
 
 class SyncTreeSpec extends AnyFlatSpec {
   implicit private val p: CorvusConfig = CorvusConfig()
-  private val width = p.syncTreeConfig.stateWidth
+  private val width = p.syncTreeConfig.flagWidth
   private val factor = p.syncTreeConfig.syncTreeFactor
   private val treeDepth = {
     var leaves = 1
