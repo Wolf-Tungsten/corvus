@@ -2,7 +2,7 @@
 
 面向仿真核的适配层，通过 `CtrlAXI4Slave` 暴露一段可读写的控制/队列地址空间，使仿真核能够：
 
-- 读取同步树状态（SyncTree）。
+- 读取/写入同步树状态（SyncTree）。
 - 读取/写入 StateBus 数据包，用于与 corvus 系统交换状态。
 
 遵循 `docs/ctrl_axi4_slave.md` 描述的 AXI4 Slave 约束（ABITS=simCoreDBusAddrWidth，DBITS=simCoreDBusDataWidth，非缓存直映地址空间，INCR 突发，单方向单 outstanding）。
