@@ -203,6 +203,11 @@ object corvus extends ChiselModule {
 
   def moduleDeps = Seq(xiangshan)
 
+  val xsResourcesPath: String = (pwd / "XiangShan" / "src" / "main" / "resources").toString()
+  val envPath:         String = sys.env("PATH") + ":" + xsResourcesPath
+
+  def forkEnv = Map("PATH" -> envPath)
+
   object test extends SbtTests with TestModule.ScalaTest {
     override def ivyDeps = super.ivyDeps() ++ Agg(
       ivy"org.scalatest::scalatest::3.2.19"
