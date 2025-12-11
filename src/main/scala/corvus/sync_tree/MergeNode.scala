@@ -16,38 +16,24 @@ class MergeNode(implicit p: CorvusConfig) extends Module {
     val out = Output(UInt(WIDTH.W))
   })
 
-  // 输出全 0 表示无效状态
-  val INVALID = 0.U(WIDTH.W)
-  val FLOATING = Fill(WIDTH, 1.U(1.W)) //
-  // 输入全 1 表示端口悬空
+  private val PENDING = 0.U(WIDTH.W)
+  private val DANGLING = Fill(WIDTH, 1.U(1.W))
 
-  // 处理悬空状态
-  val handleFloating = Wire(Vec(FACTOR, UInt(WIDTH.W)))
-  for (i <- 0 until FACTOR) {
-    when(io.in(i) === FLOATING) {
-      handleFloating(i) := io.in(0) // 第一个输入不可能是悬空的
-    }.otherwise {
-      handleFloating(i) := io.in(i)
-    }
-  }
+  private val nonDangling = io.in.map(_ =/= DANGLING)
+  private val anyNonDangling = nonDangling.reduce(_ || _)
+  private val firstState = PriorityMux(
+    io.in.zip(nonDangling).map { case (state, valid) => valid -> state } :+ (true.B -> DANGLING)
+  )
+  private val hasDisagree = io.in
+    .zip(nonDangling)
+    .map { case (state, valid) => valid && state =/= firstState }
+    .reduce(_ || _)
 
-  // 投票汇总，用二叉树结构
-  // p.syncTreeConfig.syncTreeFactor 必须为 2 的幂次方
-  val treeInternalNode = Wire(Vec(FACTOR * 2 - 1, UInt(WIDTH.W)))
-  for (i <- 0 until FACTOR) {
-    treeInternalNode(i + FACTOR - 1) := handleFloating(i)
-  }
-  // 1.全部都相等，输出该状态
-  // 2.不一致，输出无效
-  for (i <- (0 until FACTOR - 1)) {
-    when(treeInternalNode(i * 2 + 1) === treeInternalNode(i * 2 + 2)) {
-      treeInternalNode(i) := treeInternalNode(i * 2 + 1)
-    }.otherwise {
-      treeInternalNode(i) := INVALID
-    }
-  }
-  val outReg = RegInit(INVALID)
-  outReg := treeInternalNode(0)
+  private val mergedState =
+    Mux(hasDisagree, PENDING, Mux(anyNonDangling, firstState, DANGLING))
+
+  val outReg = RegInit(PENDING)
+  outReg := mergedState
   io.out := outReg
 
 }

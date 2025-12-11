@@ -8,7 +8,7 @@ class MergesTree(implicit p: CorvusConfig) extends Module {
   val NUM_S_CORE = p.numSCore
   val FACTOR = p.syncTreeConfig.syncTreeFactor
   val WIDTH = p.syncTreeConfig.flagWidth
-  val INVALID = 0.U(WIDTH.W)
+  val DANGLING = Fill(WIDTH, 1.U(1.W))
 
   val io = IO(new Bundle {
     val in = Input(Vec(NUM_S_CORE, UInt(WIDTH.W)))
@@ -24,7 +24,7 @@ class MergesTree(implicit p: CorvusConfig) extends Module {
     if (i < NUM_S_CORE) {
       leafPadding(i) := io.in(i)
     } else {
-      leafPadding(i) := INVALID
+      leafPadding(i) := DANGLING
     }
   }
   // 节点树

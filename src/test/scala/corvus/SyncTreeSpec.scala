@@ -19,14 +19,14 @@ class SyncTreeSpec extends AnyFlatSpec {
     }
     depth.max(1)
   }
-  private val floating = (BigInt(1) << width) - 1
-  private val invalid = BigInt(0)
+  private val dangling = (BigInt(1) << width) - 1
+  private val pendingState = BigInt(0)
   private val rand = new Random(0L)
 
   private def nextState(): Int = rand.nextInt(1 << width)
   private def nextValidState(): Int = {
     var candidate = nextState()
-    while (candidate == floating || candidate == invalid) {
+    while (candidate == dangling || candidate == pendingState) {
       candidate = nextState()
     }
     candidate
@@ -80,7 +80,7 @@ class SyncTreeSpec extends AnyFlatSpec {
     }
   }
 
-  it should "ignore floating slaves when merging" in {
+  it should "ignore dangling slaves when merging" in {
     simulate(new SyncTree) { c =>
       c.reset.poke(true.B)
       c.clock.step()
@@ -90,7 +90,7 @@ class SyncTreeSpec extends AnyFlatSpec {
       c.io.masterIn.poke(nextState().U(width.W))
       c.io.slaveIn(0).poke(leaderValue.U(width.W))
       for (i <- 1 until p.numSCore) {
-        c.io.slaveIn(i).poke(floating.U(width.W))
+        c.io.slaveIn(i).poke(dangling.U(width.W))
       }
 
       c.clock.step(treeDepth)
@@ -99,7 +99,24 @@ class SyncTreeSpec extends AnyFlatSpec {
     }
   }
 
-  it should "raise INVALID when slaves disagree" in {
+  it should "propagate DANGLING when all slaves are dangling" in {
+    simulate(new SyncTree) { c =>
+      c.reset.poke(true.B)
+      c.clock.step()
+      c.reset.poke(false.B)
+
+      c.io.masterIn.poke(nextState().U(width.W))
+      for (i <- 0 until p.numSCore) {
+        c.io.slaveIn(i).poke(dangling.U(width.W))
+      }
+
+      c.clock.step(treeDepth)
+
+      c.io.masterOut.expect(dangling.U(width.W))
+    }
+  }
+
+  it should "raise PENDING when slaves disagree" in {
     simulate(new SyncTree) { c =>
       c.reset.poke(true.B)
       c.clock.step()
@@ -117,7 +134,7 @@ class SyncTreeSpec extends AnyFlatSpec {
 
       c.clock.step(treeDepth)
 
-      c.io.masterOut.expect(invalid.U(width.W))
+      c.io.masterOut.expect(pendingState.U(width.W))
     }
   }
 }
