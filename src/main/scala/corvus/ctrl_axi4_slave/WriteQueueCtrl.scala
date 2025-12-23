@@ -8,13 +8,19 @@ import CtrlAXI4SlaveUtils._
 class WriteQueueCtrl(
     val addrBits: Int,
     val dataBits: Int,
-    val queueCount: Int
+    val queueCount: Int,
+    val wStallTimeoutCycles: Int = 32
 ) extends Module {
   require(dataBits == 32 || dataBits == 64, "DBITS must be 32 or 64")
   require(queueCount > 0 && isPow2(queueCount), "N_WQ must be power of 2 and > 0")
+  require(wStallTimeoutCycles >= 0, "write queue W stall timeout must be >= 0")
 
   private val wordBytesVal = wordBytes(dataBits)
   private val addrLsbVal = addrLsb(wordBytesVal)
+  private val stallTimeoutEnabled = wStallTimeoutCycles > 0
+  private val stallLimit = if (stallTimeoutEnabled) wStallTimeoutCycles - 1 else 0
+  private val stallCounterWidth = log2Ceil((wStallTimeoutCycles max 1) + 1)
+  private val stallCounter = RegInit(0.U(stallCounterWidth.W))
 
   val io = IO(new Bundle {
     val axi = new CtrlAXI4IO(addrBits, dataBits)
@@ -54,6 +60,7 @@ class WriteQueueCtrl(
   private val legalBurst = RegInit(false.B)
   private val writeBeat = RegInit(0.U(8.W))
   private val bValid = RegInit(false.B)
+  private val bResp = RegInit(RESP_OKAY)
 
   io.axi.aw.ready := !writeInFlight && !bValid
 
@@ -68,8 +75,22 @@ class WriteQueueCtrl(
       idx.U -> q.ready
     }
   )
+  private val wStall =
+    writeInFlight && !bValid && useQueue && io.axi.w.valid && !queueReady
 
-  io.axi.w.ready := writeInFlight && !bValid && (!useQueue || queueReady)
+  when(wStall && stallTimeoutEnabled.B) {
+    val limit = stallLimit.U(stallCounterWidth.W)
+    when(stallCounter =/= limit) {
+      stallCounter := stallCounter + 1.U
+    }
+  }.otherwise {
+    stallCounter := 0.U
+  }
+
+  private val stallTimedOut =
+    wStall && stallTimeoutEnabled.B && stallCounter === stallLimit.U(stallCounterWidth.W)
+
+  io.axi.w.ready := writeInFlight && !bValid && (stallTimedOut || (!useQueue || queueReady))
 
   for ((q, idx) <- io.queues.zipWithIndex) {
     val targetBeat = useQueue && queueIndex === idx.U
@@ -78,7 +99,7 @@ class WriteQueueCtrl(
   }
 
   io.axi.b.valid := bValid
-  io.axi.b.bits.resp := RESP_OKAY
+  io.axi.b.bits.resp := bResp
 
   when(io.axi.aw.fire) {
     writeInFlight := true.B
@@ -86,15 +107,23 @@ class WriteQueueCtrl(
     writeAddr := io.axi.aw.bits.addr
     legalBurst := io.axi.aw.bits.size === addrLsbVal.U && io.axi.aw.bits.burst === BURST_INCR
     writeBeat := 0.U
+    bResp := RESP_OKAY
   }
 
   when(io.axi.w.fire && writeInFlight && !bValid) {
     when(writeBeat === writeLen) {
       writeInFlight := false.B
       bValid := true.B
+      bResp := RESP_OKAY
     }.otherwise {
       writeBeat := writeBeat + 1.U
     }
+  }
+
+  when(stallTimedOut) {
+    writeInFlight := false.B
+    bValid := true.B
+    bResp := RESP_SLVERR
   }
 
   when(io.axi.b.fire) {

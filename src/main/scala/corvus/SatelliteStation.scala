@@ -25,6 +25,7 @@ class SatelliteStation(implicit p: CorvusConfig) extends Module {
   private val nWS = 2
   private val nRQ = nStateBus
   private val nWQ = nStateBus
+  private val writeQueueWStallTimeoutCycles = 32
 
   val io = IO(new Bundle {
     val ctrlAXI4Slave = new CtrlAXI4IO(addrBits, dataBits)
@@ -37,7 +38,17 @@ class SatelliteStation(implicit p: CorvusConfig) extends Module {
   })
 
   private val ctrlAXI =
-    Module(new CtrlAXI4Slave(addrBits, dataBits, nRS, nWS, nRQ, nWQ))
+    Module(
+      new CtrlAXI4Slave(
+        addrBits,
+        dataBits,
+        nRS,
+        nWS,
+        nRQ,
+        nWQ,
+        writeQueueWStallTimeoutCycles
+      )
+    )
 
   private val toCoreStateBusBuffers = Seq.fill(nStateBus) {
     Module(new Queue(UInt(dataBits.W), p.toCoreStateBusBufferDepth))

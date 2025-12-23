@@ -37,6 +37,7 @@ class CtrlAXI4IO(val addrBits: Int, val dataBits: Int) extends Bundle {
 
 object CtrlAXI4Consts {
   val RESP_OKAY = 0.U(2.W)
+  val RESP_SLVERR = 2.U(2.W)
   val BURST_INCR = 1.U(2.W)
 }
 

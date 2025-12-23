@@ -13,6 +13,7 @@
 - `nStateBus`: 并行 StateBus 数量，`>0` 且 `2^k`。
 - `toCoreStateBusBufferDepth`: 写入 corvus 方向队列深度。
 - `fromCoreStateBusBufferDepth`: 从 corvus 读出方向队列深度。
+- `writeQueueWStallTimeoutCycles`（模块内常量，默认 32，`SatelliteStation` 中定义）：流式写队列在 W 通道被背压时的超时门限（周期）；设为 0 可关闭，超时会在超时周期拉高 WREADY 消耗当前 beat，随后在 B 通道返回 SLVERR 结束该笔突发。
 - 约束：`stateBusConfig.dstWidth + stateBusConfig.payloadWidth = simCoreDBusDataWidth`，否则配置时报错。
 
 ## 顶层接口

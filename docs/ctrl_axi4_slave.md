@@ -7,7 +7,7 @@
 - 突发：仅支持 INCR 类型；ARSIZE/AWSIZE 固定为 log2(wordBytes)；ARLEN/AWLEN 在 AXI4 字段能力内不额外限制。
 - 并发：读写通道相互独立，每方向最多 1 个 in-flight 事务；允许 1 读 + 1 写并行，但同方向不接受新的 AR/AW 直到前一读/写事务的 R/B 拍全部握手完成。
 - 非对齐访问（仅寄存器子控制器）：按小端序进行字节拼接；若跨越该子控制器的地址范围，越界字节读为 0、写无副作用。
-- 响应码：所有非法/越界/未对齐访问均返回 OKAY；读返回 0 数据，写无副作用（不更新寄存器、不消费/写入队列）。
+- 响应码：默认均返回 OKAY；读返回 0 数据，写无副作用（不更新寄存器、不消费/写入队列）；仅当流式写队列 W 通道在背压状态下超过超时门限 `writeQueueWStallTimeoutCycles` 时提前终止并返回 SLVERR（默认 32，0 表示禁用超时）。
 
 ## 读状态子控制器
 - N_RS 为 2 的幂且 >0；每寄存器 DBITS 位，基址 0x00，占用 wordBytes。
@@ -34,7 +34,7 @@
 - N_WQ 为 2 的幂且 >0；接口 Vec(N_WQ, Decoupled(UInt(DBITS.W)))，基址 0x00，每队列占用 wordBytes。
 - 访问必须对齐到 wordBytes；未对齐或越界的 beat 被忽略，不入队。
 - 支持 INCR 突发；每个 beat 根据地址选择队列。
-- 队列满时对 W 通道施加背压（如拉低 WREADY）；仅在成功入队后拉高 BVALID 应答。读操作视为非法（响应码见“响应码”约定）。
+- 队列满时对 W 通道施加背压（如拉低 WREADY）；背压超过 `writeQueueWStallTimeoutCycles`（`CtrlAXI4Slave`/`WriteQueueCtrl` 模块参数，默认 32，0 表示禁用）时，将在超时周期内拉高 WREADY 以完成当前 beat 的握手，随后在 B 通道返回 SLVERR 并结束该笔突发，后续 beat 被丢弃。读操作视为非法（响应码见“响应码”约定）。
 
 ## Crossbar
 - 地址空间依次拼接：读状态(N_RS*wordBytes) → 写状态(N_WS*wordBytes) → 读队列(N_RQ*wordBytes) → 写队列(N_WQ*wordBytes)。

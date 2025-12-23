@@ -11,7 +11,8 @@ class CtrlAXI4Slave(
     val nRS: Int,
     val nWS: Int,
     val nRQ: Int,
-    val nWQ: Int
+    val nWQ: Int,
+    val writeQueueWStallTimeoutCycles: Int = 32
 ) extends Module {
   require(dataBits == 32 || dataBits == 64, "DBITS must be 32 or 64")
   require(nRS > 0 && isPow2(nRS), "N_RS must be power of 2 and > 0")
@@ -68,7 +69,7 @@ class CtrlAXI4Slave(
   private val readQueueCtrl =
     Module(new ReadQueueCtrl(addrBits, dataBits, nRQ))
   private val writeQueueCtrl =
-    Module(new WriteQueueCtrl(addrBits, dataBits, nWQ))
+    Module(new WriteQueueCtrl(addrBits, dataBits, nWQ, writeQueueWStallTimeoutCycles))
 
   readStatusCtrl.io.status := io.status
   io.control := writeStatusCtrl.io.control
