@@ -1,0 +1,5 @@
+`verilator_config
+
+// Treat XiangShan wrapper as a hierarchical block so Corvus-side iterations
+// can avoid repeatedly flattening the whole CPU internals.
+hier_block -module "XSTopWrap"

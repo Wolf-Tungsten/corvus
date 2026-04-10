@@ -4,7 +4,9 @@
 #include "flash.h"
 #include "ram.h"
 #include "verilated.h"
+#if VM_TRACE==1
 #include "verilated_fst_c.h"
+#endif
 
 #include <getopt.h>
 #include <chrono>
@@ -93,6 +95,7 @@ int main(int argc, char **argv) {
   }
 
   VSimTop *dut = new VSimTop();
+#if VM_TRACE==1
   VerilatedFstC *tfp = nullptr;
   if (cfg.enable_wave) {
     Verilated::traceEverOn(true);
@@ -100,11 +103,18 @@ int main(int argc, char **argv) {
     dut->trace(tfp, 99);
     tfp->open(cfg.wave_path.c_str());
   }
-
+#else
+  if (cfg.enable_wave){
+    std::cout<<"Trace is not enabled in verilator" << std::endl;
+    exit(1);
+  }
+#endif
   auto step_half = [&](int clk_val) {
     dut->clock = clk_val;
     dut->eval();
+#if VM_TRACE==1
     if (tfp) tfp->dump(main_time);
+#endif
     main_time += 5; // 5 time units per half cycle keeps timestamps monotonic
   };
 
@@ -152,12 +162,14 @@ int main(int argc, char **argv) {
     eprintf(ANSI_COLOR_YELLOW "SOME SIGNAL STOPS THE PROGRAM\n" ANSI_COLOR_RESET);
     eprintf(ANSI_COLOR_MAGENTA "cycleCnt = %'" PRIu64 "\n" ANSI_COLOR_RESET, cycles);
     eprintf(ANSI_COLOR_MAGENTA "simTime = %.3f s\n" ANSI_COLOR_RESET, sim_elapsed);
+    eprintf(ANSI_COLOR_MAGENTA "%.1f cycle/s\n" ANSI_COLOR_RESET, cycles/sim_elapsed);
   }
-
+#if VM_TRACE==1
   if (tfp) {
     tfp->close();
     delete tfp;
   }
+#endif
 
   flash_finish();
   delete dut;
