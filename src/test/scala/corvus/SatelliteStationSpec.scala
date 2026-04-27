@@ -235,10 +235,10 @@ class SatelliteStationSpec extends AnyFlatSpec with TestSimulatorCompat {
       assert(status0 == inSyncVal, s"Unexpected inSyncFlag value $status0")
       startRead(c, statusAddr(1), len = 0)
       val status1 = collectReadBeats(c, 1).head
-      assert(status1 == nMBus, s"Unexpected nMbus value $status0")
+      assert(status1 == nMBus, s"Unexpected nMBus value $status1")
       startRead(c, statusAddr(2), len = 0)
       val status2 = collectReadBeats(c, 1).head
-      assert(status2 == nSBus, s"Unexpected nSbus value $status0")
+      assert(status2 == nSBus, s"Unexpected nSBus value $status2")
 
       val outSyncVal = 0x2
       val nodeIdVal = 0x1234

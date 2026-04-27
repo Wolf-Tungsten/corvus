@@ -74,14 +74,14 @@ bolt-pgo: build-pgo-workload
 	fi
 	@if [ ! -e $(PROFILE_FDATA) ]; then\
 		echo "Training with PGO workload..."; \
-		(perf record -j any,u -o $(PERF_DATA) -- $(SIM_ORIG) -i $(PGO_WORKLOAD) -c $(PGO_MAX_CYCLE) && \
+		(perf record -j any,u -o $(PERF_DATA) -- $(SIM_ORIG) -i $(PGO_WORKLOAD) -c $(PGO_MAX_CYCLE) -w && \
 			[ -n "$(PERF2BOLT)" ] && \
 			$(PERF2BOLT) -p $(PERF_DATA) -o $(PROFILE_FDATA) $(SIM_ORIG)) || \
 		 (echo "linux-perf/perf2bolt unavailable, fallback to instrumentation-based PGO" && \
 			$(BOLT_BIN) $(SIM_ORIG) -instrument --instrumentation-file=$(PROFILE_FDATA) -o $(SIM_INSTR) && \
-			$(SIM_INSTR) -i $(PGO_WORKLOAD) -c $(PGO_MAX_CYCLE));\
+			$(SIM_INSTR) -i $(PGO_WORKLOAD) -c $(PGO_MAX_CYCLE) -w);\
 	else\
-		echo '\033[32mUsing an existing profile data. run `make clean-pgo` to re-gererate\033[0m';\
+		echo '\033[32mUsing an existing profile data. run `make clean-pgo` to re-generate\033[0m';\
 	fi
 	@echo "Applying BOLT..."
 	@$(BOLT_BIN) $(SIM_ORIG) -o $(SIM) -data $(PROFILE_FDATA) $(BOLT_FLAGS)

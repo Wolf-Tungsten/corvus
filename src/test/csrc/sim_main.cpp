@@ -105,8 +105,8 @@ int main(int argc, char **argv) {
   }
 #else
   if (cfg.enable_wave){
-    std::cout<<"Trace is not enabled in verilator" << std::endl;
-    exit(1);
+    std::cout<<"Trace is not enabled in verilator. Ignored" << std::endl;
+    cfg.enable_wave = false;
   }
 #endif
   auto step_half = [&](int clk_val) {
@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
   }
 
   if (signal_num) {
-    const auto sim_elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - sim_start_time).count();
+    const auto sim_elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - sim_start_time).count() + + 1e-6;
     eprintf(ANSI_COLOR_YELLOW "SOME SIGNAL STOPS THE PROGRAM\n" ANSI_COLOR_RESET);
     eprintf(ANSI_COLOR_MAGENTA "cycleCnt = %'" PRIu64 "\n" ANSI_COLOR_RESET, cycles);
     eprintf(ANSI_COLOR_MAGENTA "simTime = %.3f s\n" ANSI_COLOR_RESET, sim_elapsed);
