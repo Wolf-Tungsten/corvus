@@ -52,8 +52,8 @@ class Top(implicit p: CorvusConfig) extends Module with RequireAsyncReset {
 
   // Index 0 = master station, indices 1..numSCore = satellite stations
   // Master station reuses SatelliteStation but only exposes MBus queues
-  val masterStation = Module(new SatelliteStation(p.nMBus))
-  val satelliteStations = Seq.fill(numTotalCore - 1)(Module(new SatelliteStation(p.nStateBus)))
+  val masterStation = Module(new SatelliteStation(LocalBusCounts(p.nMBus)))
+  val satelliteStations = Seq.fill(numTotalCore - 1)(Module(new SatelliteStation(LocalBusCounts(p.nMBus, p.nSBus))))
   val allStations = masterStation +: satelliteStations
   val mBusRingNodes = Seq.fill(numTotalCore)(Seq.fill(p.nMBus)(Module(new RingNode)))
   val sBusRingNodes = Seq.fill(numTotalCore - 1)(Seq.fill(p.nSBus)(Module(new RingNode)))
@@ -134,7 +134,7 @@ class Top(implicit p: CorvusConfig) extends Module with RequireAsyncReset {
     val satAwId = RegInit(0.U(satAxi.aw.bits.id.getWidth.W))
 
     sat.io.ctrlAXI4Slave.ar.valid := satAxi.ar.valid
-    sat.io.ctrlAXI4Slave.ar.bits.addr := satAxi.ar.bits.addr - satelliteAddr.base.U  // FIXME： wind up
+    sat.io.ctrlAXI4Slave.ar.bits.addr := satAxi.ar.bits.addr - satelliteAddr.base.U
     sat.io.ctrlAXI4Slave.ar.bits.len := satAxi.ar.bits.len
     sat.io.ctrlAXI4Slave.ar.bits.size := satAxi.ar.bits.size
     sat.io.ctrlAXI4Slave.ar.bits.burst := satAxi.ar.bits.burst

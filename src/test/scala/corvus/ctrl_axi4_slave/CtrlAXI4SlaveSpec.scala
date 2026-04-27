@@ -410,7 +410,7 @@ class CtrlAXI4SlaveSpec extends AnyFlatSpec with TestSimulatorCompat {
       )
       startRead(c, controlAddr(5), len = 0)
       val ignored = collectReadBeats(c, 1).head
-      assert(ignored == 0)
+      assert(ignored == ((BigInt(1) << dataBits) - 1))
 
       val legal = BigInt("1122334455667788", 16)
       writeBurst(c, controlAddr(5), Seq(legal))

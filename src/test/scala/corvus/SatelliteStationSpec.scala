@@ -13,20 +13,22 @@ class SatelliteStationSpec extends AnyFlatSpec with TestSimulatorCompat {
 
   private val addrBits = p.simCoreDBusAddrWidth
   private val dataBits = p.simCoreDBusDataWidth
+  private val nMBus = p.nMBus
+  private val nSBus = p.nSBus
   private val nStateBus = p.nStateBus
   private val dstWidth = p.stateBusConfig.dstWidth
   private val payloadWidth = p.stateBusConfig.payloadWidth
   private val wordBytes = dataBits / 8
   private val sizeVal = log2Ceil(wordBytes)
   private val fullStrbMask = (BigInt(1) << wordBytes) - 1
-  private val nRS = 1 << log2Ceil(1 + 2 * nStateBus)
+  private val nRS = 1 << log2Ceil(1 + 2 + 2 * nStateBus)
   private val nWS = 2
   private val nRQ = nStateBus
   private val nWQ = nStateBus
 
   /** Harness exposing the DUT IO for easier pokes/peeks. */
-  private class SatelliteStationHarness(localStateBusCount: Int = nStateBus) extends Module {
-    private val localNStateBus = localStateBusCount
+  private class SatelliteStationHarness(localStateBusCount: LocalBusCounts = LocalBusCounts(nMBus, nSBus)) extends Module {
+    private val localNStateBus = localStateBusCount.total
 
     val io = IO(new Bundle {
       val axi = new CtrlAXI4IO(addrBits, dataBits)
@@ -38,7 +40,7 @@ class SatelliteStationSpec extends AnyFlatSpec with TestSimulatorCompat {
       val fullIntr = Output(Bool())
       val toCoreNonEmpty = Output(Bool())
     })
-    val dut = Module(new SatelliteStation(localNStateBus))
+    val dut = Module(new SatelliteStation(localStateBusCount))
 
     dut.io.ctrlAXI4Slave <> io.axi
     dut.io.inSyncFlag := io.inSyncFlag
@@ -59,8 +61,8 @@ class SatelliteStationSpec extends AnyFlatSpec with TestSimulatorCompat {
   private def controlAddr(idx: Int) = writeBase + idx * wordBytes
   private def readQueueAddr(idx: Int) = readQBase + idx * wordBytes
   private def writeQueueAddr(idx: Int) = writeQBase + idx * wordBytes
-  private def toCoreCountStatusAddr(idx: Int) = statusAddr(1 + idx)
-  private def fromCoreCountStatusAddr(idx: Int) = statusAddr(1 + nStateBus + idx)
+  private def toCoreCountStatusAddr(idx: Int) = statusAddr(3 + idx)
+  private def fromCoreCountStatusAddr(idx: Int) = statusAddr(3 + nStateBus + idx)
 
   private def resetAndInit(c: SatelliteStationHarness): Unit = {
     c.reset.poke(true.B)
@@ -223,7 +225,7 @@ class SatelliteStationSpec extends AnyFlatSpec with TestSimulatorCompat {
   behavior of "SatelliteStation"
 
   it should "read status and write control registers via AXI" in {
-    simulate(new SatelliteStationHarness) { c =>
+    simulate(new SatelliteStationHarness(LocalBusCounts(nMBus, nSBus))) { c =>
       resetAndInit(c)
       val inSyncVal = 0x3
       c.io.inSyncFlag.poke(inSyncVal.U)
@@ -231,6 +233,12 @@ class SatelliteStationSpec extends AnyFlatSpec with TestSimulatorCompat {
       startRead(c, statusAddr(0), len = 0)
       val status0 = collectReadBeats(c, 1).head
       assert(status0 == inSyncVal, s"Unexpected inSyncFlag value $status0")
+      startRead(c, statusAddr(1), len = 0)
+      val status1 = collectReadBeats(c, 1).head
+      assert(status1 == nMBus, s"Unexpected nMbus value $status0")
+      startRead(c, statusAddr(2), len = 0)
+      val status2 = collectReadBeats(c, 1).head
+      assert(status2 == nSBus, s"Unexpected nSbus value $status0")
 
       val outSyncVal = 0x2
       val nodeIdVal = 0x1234
@@ -324,13 +332,13 @@ class SatelliteStationSpec extends AnyFlatSpec with TestSimulatorCompat {
   }
 
   it should "support reduced local state bus count for master station" in {
-    val localStateBusCount = p.nMBus
-    val localNRS = 1 << log2Ceil(1 + 2 * localStateBusCount)
+    val localStateBusCount = nMBus
+    val localNRS = 1 << log2Ceil(1 + 2 + 2 * localStateBusCount)
     val localReadQBase = (localNRS + nWS) * wordBytes
     val localWriteQBase = (localNRS + nWS + localStateBusCount) * wordBytes
     val idx = localStateBusCount - 1
 
-    simulate(new SatelliteStationHarness(localStateBusCount)) { c =>
+    simulate(new SatelliteStationHarness(LocalBusCounts(localStateBusCount, 0))) { c =>
       resetAndInit(c)
 
       val dstVal = 0x33

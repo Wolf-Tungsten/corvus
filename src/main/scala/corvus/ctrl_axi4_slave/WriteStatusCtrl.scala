@@ -22,7 +22,7 @@ class WriteStatusCtrl(
   })
 
   private val controlRegs =
-    RegInit(VecInit(Seq.fill(regCount)(0.U(dataBits.W))))
+    RegInit(VecInit(Seq.fill(regCount)(((BigInt(1) << dataBits) - 1).U(dataBits.W))))
   io.control := controlRegs
 
   // Read channel

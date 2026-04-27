@@ -67,8 +67,8 @@ class WriteStatusCtrlSpec extends AnyFlatSpec with TestSimulatorCompat {
       c.clock.step()
       c.io.axi.ar.valid.poke(false.B)
       c.io.axi.r.valid.expect(true.B)
-      c.io.control(0).expect("hBBCCDD00".U)
-      c.io.axi.r.bits.data.expect("hBBCCDD00".U)
+      c.io.control(0).expect("hBBCCDDFF".U) // reset value is FF..FF
+      c.io.axi.r.bits.data.expect("hBBCCDDFF".U)
       c.io.axi.r.bits.last.expect(true.B)
       c.clock.step()
 
@@ -78,8 +78,8 @@ class WriteStatusCtrlSpec extends AnyFlatSpec with TestSimulatorCompat {
       c.clock.step()
       c.io.axi.ar.valid.poke(false.B)
       c.io.axi.r.valid.expect(true.B)
-      c.io.control(1).expect("h000000AA".U)
-      c.io.axi.r.bits.data.expect("h000000AA".U)
+      c.io.control(1).expect("hFFFFFFAA".U) // reset value is FF..FF
+      c.io.axi.r.bits.data.expect("hFFFFFFAA".U)
     }
   }
 

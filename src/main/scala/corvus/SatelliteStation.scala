@@ -5,17 +5,23 @@ import chisel3.util._
 import corvus.ctrl_axi4_slave._
 import corvus.state_bus.StateBusPacket
 
-class SatelliteStation(localStateBusCount: Int)(implicit p: CorvusConfig) extends Module {
-  def this()(implicit p: CorvusConfig) = this(p.nStateBus)
+case class LocalBusCounts(mbus: Int, sbus: Int = 0){
+  def total: Int = mbus + sbus
+}
+
+class SatelliteStation(localStateBusCount: LocalBusCounts)(implicit p: CorvusConfig) extends Module {
+  def this()(implicit p: CorvusConfig) = this(LocalBusCounts(p.nMBus, p.nSBus))
 
   private val addrBits = p.simCoreDBusAddrWidth
   private val dataBits = p.simCoreDBusDataWidth
-  private val nStateBus = localStateBusCount
+  private val nSbus    = localStateBusCount.sbus;
+  private val nMbus    = localStateBusCount.mbus;
+  private val nLocalStateBus = localStateBusCount.total
   private val dstWidth = p.stateBusConfig.dstWidth
   private val payloadWidth = p.stateBusConfig.payloadWidth
 
   require(dataBits == 32 || dataBits == 64, "simCoreDBusDataWidth must be 32 or 64")
-  require(nStateBus > 0 && isPow2(nStateBus), "localStateBusCount must be power of 2 and > 0")
+  require(nLocalStateBus > 0 && isPow2(nLocalStateBus), "localStateBusCount must be power of 2 and > 0")
   require(
     dstWidth + payloadWidth == dataBits,
     "stateBusConfig.dstWidth + payloadWidth must equal simCoreDBusDataWidth"
@@ -23,10 +29,10 @@ class SatelliteStation(localStateBusCount: Int)(implicit p: CorvusConfig) extend
   require(p.toCoreStateBusBufferDepth > 0, "toCoreStateBusBufferDepth must be > 0")
   require(p.fromCoreStateBusBufferDepth > 0, "fromCoreStateBusBufferDepth must be > 0")
 
-  private val nRS = 1 << log2Ceil(1 + 2 * nStateBus)
+  private val nRS = 1 << log2Ceil(1 + 2 + 2 * nLocalStateBus) // inSyncFlag + mBus + sBus + toCoreStateBusBuffer[] + fromCoreStateBusBuffer[]
   private val nWS = 2
-  private val nRQ = nStateBus
-  private val nWQ = nStateBus
+  private val nRQ = nLocalStateBus
+  private val nWQ = nLocalStateBus
   private val writeQueueWStallTimeoutCycles = 32
 
   val io = IO(new Bundle {
@@ -36,8 +42,8 @@ class SatelliteStation(localStateBusCount: Int)(implicit p: CorvusConfig) extend
     val inSyncFlag = Input(UInt(p.syncTreeConfig.flagWidth.W))
     val outSyncFlag = Output(UInt(p.syncTreeConfig.flagWidth.W))
     val nodeId = Output(UInt(dstWidth.W))
-    val toCoreStateBusPort = Vec(nStateBus, Flipped(Decoupled(new StateBusPacket)))
-    val fromCoreStateBusPort = Vec(nStateBus, Decoupled(new StateBusPacket))
+    val toCoreStateBusPort = Vec(nLocalStateBus, Flipped(Decoupled(new StateBusPacket)))
+    val fromCoreStateBusPort = Vec(nLocalStateBus, Decoupled(new StateBusPacket))
   })
 
   private val ctrlAXI =
@@ -53,16 +59,16 @@ class SatelliteStation(localStateBusCount: Int)(implicit p: CorvusConfig) extend
       )
     )
 
-  private val toCoreStateBusBuffers = Seq.fill(nStateBus) {
+  private val toCoreStateBusBuffers = Seq.fill(nLocalStateBus) {
     Module(new Queue(UInt(dataBits.W), p.toCoreStateBusBufferDepth))
   }
-  private val fromCoreStateBusBuffers = Seq.fill(nStateBus) {
+  private val fromCoreStateBusBuffers = Seq.fill(nLocalStateBus) {
     Module(new Queue(UInt(dataBits.W), p.fromCoreStateBusBufferDepth))
   }
 
   ctrlAXI.io.axi <> io.ctrlAXI4Slave
 
-  for (i <- 0 until nStateBus) {
+  for (i <- 0 until nLocalStateBus) {
     fromCoreStateBusBuffers(i).io.enq <> ctrlAXI.io.writeQueues(i)
     ctrlAXI.io.readQueues(i) <> toCoreStateBusBuffers(i).io.deq
   }
@@ -72,9 +78,11 @@ class SatelliteStation(localStateBusCount: Int)(implicit p: CorvusConfig) extend
     statusRegs(i) := 0.U
   }
   statusRegs(0) := io.inSyncFlag
-  for (i <- 0 until nStateBus) {
-    statusRegs(1 + i) := toCoreStateBusBuffers(i).io.count
-    statusRegs(1 + nStateBus + i) := fromCoreStateBusBuffers(i).io.count
+  statusRegs(1) := nMbus.U
+  statusRegs(2) := nSbus.U
+  for (i <- 0 until nLocalStateBus) {
+    statusRegs(3 + i) := toCoreStateBusBuffers(i).io.count
+    statusRegs(3 + nLocalStateBus + i) := fromCoreStateBusBuffers(i).io.count
   }
   ctrlAXI.io.status := statusRegs
 
