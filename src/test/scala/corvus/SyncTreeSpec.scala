@@ -19,8 +19,8 @@ class SyncTreeSpec extends AnyFlatSpec with TestSimulatorCompat {
     }
     depth.max(1)
   }
-  private val dangling = (BigInt(1) << width) - 1
-  private val pendingState = BigInt(0)
+  private val pendingState = (BigInt(1) << width) - 1
+  private val dangling = BigInt(0)
   private val rand = new Random(0L)
 
   private def nextState(): Int = rand.nextInt(1 << width)

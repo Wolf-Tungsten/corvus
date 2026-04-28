@@ -15,7 +15,7 @@
 ## 同步树的逻辑
 广播树的逻辑：将主控核设置的值向下广播到所有叶节点
 归并树的逻辑
-- 编码约定：S_PENDING 为全 0，S_DANGLING 为全 1（位宽见 `syncTreeConfig.flagWidth`）
+- 编码约定：S_PENDING 为全 1，S_DANGLING 为全 0（位宽见 `syncTreeConfig.flagWidth`）
 - 叶节点捕获仿真核/总线部件的状态，或者硬连成 S_DANGLING；树的补齐叶子也填 S_DANGLING
 - 归并节点规则（逐层重复直到根）：
   - 若所有子节点均为 S_DANGLING，则输出 S_DANGLING

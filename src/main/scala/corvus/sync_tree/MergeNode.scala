@@ -16,8 +16,8 @@ class MergeNode(implicit p: CorvusConfig) extends Module {
     val out = Output(UInt(WIDTH.W))
   })
 
-  private val PENDING = 0.U(WIDTH.W)
-  private val DANGLING = Fill(WIDTH, 1.U(1.W))
+  private val PENDING = ((BigInt(1) << WIDTH) - 1).U(WIDTH.W)
+  private val DANGLING = 0.U(WIDTH.W) // keep sync with MergesTree
 
   private val nonDangling = io.in.map(_ =/= DANGLING)
   private val anyNonDangling = nonDangling.reduce(_ || _)
